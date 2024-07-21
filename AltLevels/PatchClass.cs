@@ -95,8 +95,12 @@ public class PatchClass
     [HarmonyPatch(typeof(Player), nameof(Player.HandleActionRaiseSkill), new Type[] { typeof(Skill), typeof(uint) })]
     public static bool PreHandleActionRaiseSkill(Skill skill, uint amount, ref Player __instance, ref bool __result)
     {
-        //Modify original method to use an alternative leveling method that adjusts InitValue and stores number of levels in a PropInt
-        __result = __instance.TryRaiseSkill(skill);
+        //Pretend amount is the number of levels
+        amount = amount > 300 ? 10 : 1u;
+
+        for (var i = 0; i < amount; i++)
+            if (!__instance.TryRaiseSkill(skill))
+                break;
 
         //Try to always update?
         __instance.Session.Network.EnqueueSend(new GameMessagePrivateUpdateSkill(__instance, __instance.GetCreatureSkill(skill, false)));
@@ -128,7 +132,12 @@ public class PatchClass
     [HarmonyPatch(typeof(Player), nameof(Player.HandleActionRaiseAttribute), new Type[] { typeof(PropertyAttribute), typeof(uint) })]
     public static bool PreHandleActionRaiseAttribute(PropertyAttribute attribute, uint amount, ref Player __instance, ref bool __result)
     {
-        __result = __instance.TryRaiseAttribute(attribute);
+        //Pretend amount is the number of levels
+        amount = amount > 300 ? 10 : 1u;
+
+        for(var i = 0; i < amount; i++)
+            if (!__instance.TryRaiseAttribute(attribute))
+                break;
 
         if (__instance.Attributes.TryGetValue(attribute, out var creatureAttribute))
             __instance.Session.Network.EnqueueSend(new GameMessagePrivateUpdateAttribute(__instance, creatureAttribute));
@@ -148,7 +157,12 @@ public class PatchClass
     [HarmonyPatch(typeof(Player), nameof(Player.HandleActionRaiseVital), new Type[] { typeof(PropertyAttribute2nd), typeof(uint) })]
     public static bool PreHandleActionRaiseVital(PropertyAttribute2nd vital, uint amount, ref Player __instance, ref bool __result)
     {
-        __result = __instance.TryRaiseVital(vital);
+        //Pretend amount is the number of levels
+        amount = amount > 300 ? 10 : 1u;
+
+        for (var i = 0; i < amount; i++)
+            if (!__instance.TryRaiseVital(vital))
+                break;
 
         if (__instance.Vitals.TryGetValue(vital, out var creatureVital))
             __instance.Session.Network.EnqueueSend(new GameMessagePrivateUpdateVital(__instance, creatureVital));
