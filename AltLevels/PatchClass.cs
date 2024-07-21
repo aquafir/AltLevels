@@ -124,15 +124,76 @@ public class PatchClass
     //}
 
 
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(Player), nameof(Player.HandleActionRaiseAttribute), new Type[] { typeof(PropertyAttribute), typeof(uint) })]
+    public static bool PreHandleActionRaiseAttribute(PropertyAttribute attribute, uint amount, ref Player __instance, ref bool __result)
+    {
+        __result = __instance.TryRaiseAttribute(attribute);
+
+        if (__instance.Attributes.TryGetValue(attribute, out var creatureAttribute))
+            __instance.Session.Network.EnqueueSend(new GameMessagePrivateUpdateAttribute(__instance, creatureAttribute));
+
+        return false;
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(CreatureVital), nameof(CreatureVital.StartingValue), MethodType.Getter)]
+    public static void PostGetStartingValue(ref CreatureVital __instance, ref uint __result)
+    {
+        __result += (uint)__instance.creature.GetVitalLevel(__instance.Vital);
+    }
+
+
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(Player), nameof(Player.HandleActionRaiseVital), new Type[] { typeof(PropertyAttribute2nd), typeof(uint) })]
+    public static bool PreHandleActionRaiseVital(PropertyAttribute2nd vital, uint amount, ref Player __instance, ref bool __result)
+    {
+        __result = __instance.TryRaiseVital(vital);
+
+        if (__instance.Vitals.TryGetValue(vital, out var creatureVital))
+            __instance.Session.Network.EnqueueSend(new GameMessagePrivateUpdateVital(__instance, creatureVital));
+
+        return false;
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(CreatureAttribute), nameof(CreatureAttribute.StartingValue), MethodType.Getter)]
+    public static void PostGetStartingValue(ref CreatureAttribute __instance, ref uint __result)
+    {
+        __result += (uint)__instance.creature.GetAttributeLevel(__instance.Attribute);
+    }
+
+
     const int spacing = -20;
-    [CommandHandler("skills", AccessLevel.Player, CommandHandlerFlag.RequiresWorld, 0)]
-    public static void HandleSkills(Session session, params string[] parameters)
+    [CommandHandler("levels", AccessLevel.Player, CommandHandlerFlag.RequiresWorld, 0)]
+    public static void HandleLevels(Session session, params string[] parameters)
     {
         var player = session.Player;
 
-        var sb = new StringBuilder($"\n{"Level",spacing}{"Cost",spacing}{"Skill",spacing}");
+        var sb = new StringBuilder($"\n{"Level",spacing}{"Cost",spacing}{"Name",spacing}");
 
-        foreach(var skill in Enum.GetValues<Skill>().OrderBy(x => x.ToString()))
+        sb.Append($"\n\n============Attributes============");
+        foreach (var attr in Enum.GetValues<PropertyAttribute>().OrderBy(x => x.ToString()))
+        {
+            //Skip skills you can't level?
+            if (!player.TryGetAttributeCost(attr, out var cost))
+                continue;
+            var level = player.GetAttributeLevel(attr);
+            sb.Append($"\n{level,spacing}{cost,spacing}{attr,spacing}");
+        }
+
+        sb.Append($"\n\n============Vitals============");
+        foreach (var attr in Enum.GetValues<PropertyAttribute2nd>().OrderBy(x => x.ToString()))
+        {
+            //Skip skills you can't level?
+            if (!attr.ToString().StartsWith("Max") || !player.TryGetVitalCost(attr, out var cost))
+                continue;
+            var level = player.GetVitalLevel(attr);
+            sb.Append($"\n{level,spacing}{cost,spacing}{attr,spacing}");
+        }
+
+        sb.Append($"\n\n============Skills============");
+        foreach (var skill in Enum.GetValues<Skill>().OrderBy(x => x.ToString()))
         {
             //Skip skills you can't level?
             if (!player.TryGetSkillCost(skill, out var cost))
